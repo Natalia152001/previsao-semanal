@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Previsão Semanal — Monitoramento Diário</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f5f5f3; color: #1a1a1a; min-height: 100vh; padding: 1.5rem; font-size: 14px; }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+
+  header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem; }
+  header h1 { font-size: 20px; font-weight: 600; color: #111; }
+  header p { font-size: 12px; color: #888; margin-top: 3px; }
+  #ref-btn { font-family: inherit; font-size: 12px; padding: 6px 16px; border-radius: 8px; border: 1px solid #d0d0cc; background: #fff; color: #444; cursor: pointer; }
+  #ref-btn:hover { background: #f0f0ee; }
+  #ref-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+  .card { background: #fff; border-radius: 10px; border: 1px solid #e8e8e4; padding: 0.75rem 1rem; }
+  .card .lbl { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .card .val { font-size: 22px; font-weight: 600; color: #111; }
+  .card .sub { font-size: 11px; color: #aaa; margin-top: 2px; }
+  .card.warn .val { color: #d97706; }
+  .card.danger .val { color: #dc2626; }
+
+  .state-block { margin-bottom: 1.5rem; background: #fff; border-radius: 10px; border: 1px solid #e8e8e4; overflow: hidden; }
+  .state-label { font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.07em; padding: 10px 14px 8px; border-bottom: 1px solid #f0f0ee; background: #fafaf8; }
+
+  /* Scrollable table wrapper */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 820px; }
+  thead tr:first-child th { background: #fafaf8; }
+
+  /* Header row 1: day names */
+  th.day-head { text-align: center; font-size: 11px; font-weight: 600; color: #444; padding: 8px 6px 4px; border-bottom: none; white-space: nowrap; }
+  th.day-head.today { color: #1d4ed8; background: #eff6ff; }
+  th.day-sub { text-align: center; font-size: 10px; font-weight: 400; color: #aaa; padding: 2px 6px 6px; border-bottom: 1px solid #f0f0ee; }
+  th.day-sub.today { background: #eff6ff; }
+  th.city-head { text-align: left; font-size: 11px; font-weight: 500; color: #888; padding: 8px 14px 6px; border-bottom: 1px solid #f0f0ee; white-space: nowrap; vertical-align: bottom; }
+
+  td { padding: 5px 6px; border-bottom: 1px solid #f7f7f5; vertical-align: middle; }
+  td.city-name { padding: 5px 14px; font-size: 13px; color: #222; white-space: nowrap; font-weight: 500; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafaf8; }
+  tr:hover td.today-col { background: #e8f0fe; }
+
+  .day-cell { text-align: center; min-width: 110px; }
+  .today-col { background: #f5f8ff; }
+
+  .temps { display: flex; justify-content: center; align-items: center; gap: 4px; margin-bottom: 3px; font-size: 11px; }
+  .temp-min { color: #2563eb; font-weight: 500; }
+  .temp-max { color: #d97706; font-weight: 500; }
+  .sep { color: #ddd; }
+
+  .rain-row { display: flex; align-items: center; gap: 5px; justify-content: center; }
+  .rain-bg { width: 50px; height: 3px; background: #e8e8e4; border-radius: 2px; flex-shrink: 0; }
+  .rain-fill { height: 3px; background: #3b82f6; border-radius: 2px; }
+  .rain-val { font-size: 11px; color: #555; min-width: 34px; text-align: right; }
+
+  .frost-tag { display: inline-block; font-size: 9px; font-weight: 600; background: #fee2e2; color: #dc2626; border-radius: 3px; padding: 1px 5px; margin-top: 2px; }
+
+  .loading { color: #888; font-size: 14px; padding: 2.5rem; text-align: center; }
+  .err { color: #dc2626; font-size: 13px; background: #fee2e2; border: 1px solid #fecaca; padding: 0.75rem 1rem; border-radius: 8px; margin: 1rem 0; }
+
+  footer { margin-top: 2.5rem; border-top: 1px solid #e8e8e4; padding-top: 1.5rem; }
+  .footer-data { font-size: 11px; color: #aaa; text-align: center; margin-bottom: 1.5rem; }
+  .footer-data a { color: #888; }
+  .footer-brand { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 1rem; background: #fff; border-radius: 10px; border: 1px solid #e8e8e4; }
+  .footer-brand-text { display: flex; flex-direction: column; }
+  .footer-brand-powered { font-size: 9px; color: #bbb; text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 1px; }
+  .footer-brand-name { font-size: 15px; font-weight: 700; letter-spacing: 0.12em; color: #1a2356; }
+
+  @media (max-width: 640px) {
+    .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    body { padding: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Previsão Semanal do Tempo</h1>
+      <p id="upd-label">carregando dados...</p>
+    </div>
+    <button id="ref-btn" onclick="loadAll()">⟳ Atualizar</button>
+  </header>
+
+  <div class="cards">
+    <div class="card"><div class="lbl">Cidades monitoradas</div><div class="val" id="c-total">—</div></div>
+    <div class="card warn"><div class="lbl">Maior chuva hoje</div><div class="val" id="c-rain">—</div><div class="sub" id="c-rain-city">—</div></div>
+    <div class="card"><div class="lbl">Menor temperatura hoje</div><div class="val" id="c-tmin">—</div><div class="sub" id="c-tmin-city">—</div></div>
+    <div class="card danger"><div class="lbl">Alertas de geada hoje</div><div class="val" id="c-frost">—</div><div class="sub">cidades com ≤ 2°C</div></div>
+  </div>
+
+  <div id="content"><div class="loading">Buscando dados para 38 cidades...</div></div>
+
+  <footer>
+    <div class="footer-data">
+      Dados: <a href="https://open-meteo.com" target="_blank">Open-Meteo.com</a> — gratuito, sem cadastro.
+      Precipitação acumulada diária · Geada: alerta quando mínima ≤ 2°C
+    </div>
+    <div class="footer-brand">
+      <svg width="28" height="36" viewBox="0 0 28 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="fg1" x1="14" y1="0" x2="4" y2="36" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#00c8f0"/>
+            <stop offset="35%" stop-color="#6a3de8"/>
+            <stop offset="70%" stop-color="#c030b0"/>
+            <stop offset="100%" stop-color="#f5822a"/>
+          </linearGradient>
+          <linearGradient id="fg2" x1="20" y1="4" x2="10" y2="36" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#4a6cf7"/>
+            <stop offset="50%" stop-color="#8b2fc9"/>
+            <stop offset="100%" stop-color="#d63eb0"/>
+          </linearGradient>
+          <linearGradient id="fg3" x1="24" y1="8" x2="16" y2="36" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#00c8f0"/>
+            <stop offset="100%" stop-color="#6a3de8"/>
+          </linearGradient>
+        </defs>
+        <path d="M4 32 C2 24 6 16 10 10 C8 18 12 24 10 32 Z" fill="url(#fg1)" opacity="0.95"/>
+        <path d="M10 34 C6 26 8 14 14 4 C14 14 18 22 14 34 Z" fill="url(#fg2)"/>
+        <path d="M18 32 C16 22 18 14 24 8 C22 16 20 24 20 32 Z" fill="url(#fg3)" opacity="0.9"/>
+      </svg>
+      <div class="footer-brand-text">
+        <span class="footer-brand-powered">Powered by</span>
+        <span class="footer-brand-name">FLAMMA LAB</span>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<script>
+const CITIES = [
+  {n:"Cascavel",uf:"BA",lat:-14.4028,lon:-41.3197},{n:"Ibicoara",uf:"BA",lat:-13.4081,lon:-41.2872},
+  {n:"Irecê",uf:"BA",lat:-11.3042,lon:-41.8553},{n:"Juazeiro",uf:"BA",lat:-9.4128,lon:-40.5028},
+  {n:"Mucugê",uf:"BA",lat:-13.0058,lon:-41.3708},{n:"Ribeira do Amparo",uf:"BA",lat:-11.0428,lon:-38.4392},
+  {n:"Cristalina",uf:"GO",lat:-16.7681,lon:-47.6139},{n:"Goiânia",uf:"GO",lat:-16.6869,lon:-49.2648},
+  {n:"Araguari",uf:"MG",lat:-18.6481,lon:-48.1861},{n:"Araxá",uf:"MG",lat:-19.5928,lon:-46.9439},
+  {n:"Bueno Brandão",uf:"MG",lat:-22.4461,lon:-46.3553},{n:"Ipuiúna",uf:"MG",lat:-22.1678,lon:-46.1550},
+  {n:"Munhoz",uf:"MG",lat:-22.6111,lon:-46.2978},{n:"Pouso Alegre",uf:"MG",lat:-22.2297,lon:-45.9358},
+  {n:"Sacramento",uf:"MG",lat:-19.8581,lon:-47.4422},{n:"Santa Juliana",uf:"MG",lat:-19.3128,lon:-47.5303},
+  {n:"São Gonçalo do Sapucaí",uf:"MG",lat:-21.8942,lon:-45.5919},{n:"São Gotardo",uf:"MG",lat:-19.3117,lon:-46.0522},
+  {n:"Uberaba",uf:"MG",lat:-19.7472,lon:-47.9378},{n:"Petrolina",uf:"PE",lat:-9.3958,lon:-40.4997},
+  {n:"Canto do Buriti",uf:"PI",lat:-8.1128,lon:-42.9439},{n:"Assaí",uf:"PR",lat:-23.3778,lon:-50.8511},
+  {n:"Contenda",uf:"PR",lat:-25.6811,lon:-49.5381},{n:"Faxinal",uf:"PR",lat:-23.9769,lon:-51.3253},
+  {n:"Guarapuava",uf:"PR",lat:-25.3908,lon:-51.4578},{n:"Lapa",uf:"PR",lat:-25.7678,lon:-49.7172},
+  {n:"São Mateus do Sul",uf:"PR",lat:-25.8708,lon:-50.3808},{n:"Mossoró",uf:"RN",lat:-5.1878,lon:-37.3439},
+  {n:"Bom Jesus",uf:"RS",lat:-28.6678,lon:-50.4308},{n:"Aurora",uf:"SC",lat:-27.3058,lon:-49.6339},
+  {n:"Ituporanga",uf:"SC",lat:-27.4139,lon:-49.5983},{n:"Araraquara",uf:"SP",lat:-21.7947,lon:-48.1758},
+  {n:"Itapetininga",uf:"SP",lat:-23.5917,lon:-48.0531},{n:"Itapira",uf:"SP",lat:-22.4358,lon:-46.8228},
+  {n:"Piedade",uf:"SP",lat:-23.7128,lon:-47.4258},{n:"Ribeirão Branco",uf:"SP",lat:-24.2208,lon:-48.7642},
+  {n:"São Paulo",uf:"SP",lat:-23.5505,lon:-46.6333},{n:"Vargem Grande do Sul",uf:"SP",lat:-21.8253,lon:-46.8953}
+];
+
+const STATE_NAMES = {BA:"Bahia",GO:"Goiás",MG:"Minas Gerais",PE:"Pernambuco",PI:"Piauí",PR:"Paraná",RN:"Rio G. do Norte",RS:"Rio G. do Sul",SC:"Santa Catarina",SP:"São Paulo"};
+const DAYS_PT = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+
+let allData = [], dates = [];
+
+async function fetchCity(c) {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}&daily=precipitation_sum,temperature_2m_min,temperature_2m_max&timezone=America%2FSao_Paulo&forecast_days=7`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const json = await r.json();
+  if (!json.daily || !json.daily.time) throw new Error('Resposta inválida da API');
+  return { city: c, d: json.daily };
+}
+
+async function loadAll() {
+  const btn = document.getElementById('ref-btn');
+  btn.textContent = '...'; btn.disabled = true;
+  document.getElementById('content').innerHTML = '<div class="loading">Buscando dados para 38 cidades...</div>';
+
+  // Detect if running from file:// (CORS will block requests)
+  if (window.location.protocol === 'file:') {
+    document.getElementById('content').innerHTML = `
+      <div class="err">
+        <strong>Como abrir este arquivo corretamente:</strong><br><br>
+        Abrir um arquivo HTML diretamente pelo Windows Explorer bloqueia conexões externas (restrição de segurança do navegador).<br><br>
+        <strong>Solução — escolha uma das opções abaixo:</strong><br><br>
+        <strong>Opção 1 — Chrome (mais fácil):</strong><br>
+        Feche o Chrome. Abra o Prompt de Comando e rode:<br>
+        <code style="background:#fef2f2;padding:4px 8px;border-radius:4px;display:inline-block;margin:6px 0">chrome.exe --allow-file-access-from-files</code><br>
+        Depois abra o arquivo normalmente.<br><br>
+        <strong>Opção 2 — VS Code Live Server:</strong><br>
+        Instale a extensão "Live Server" no VS Code, clique com botão direito no arquivo e escolha "Open with Live Server".<br><br>
+        <strong>Opção 3 — Python (se instalado):</strong><br>
+        Abra o Prompt de Comando na pasta do arquivo e rode:<br>
+        <code style="background:#fef2f2;padding:4px 8px;border-radius:4px;display:inline-block;margin:6px 0">python -m http.server 8080</code><br>
+        Depois acesse <a href="http://localhost:8080" target="_blank">http://localhost:8080</a> no navegador.
+      </div>`;
+    btn.textContent = '⟳ Atualizar'; btn.disabled = false;
+    return;
+  }
+
+  try {
+    const results = [];
+    for (let i = 0; i < CITIES.length; i += 8) {
+      const batch = CITIES.slice(i, i + 8);
+      const fetches = await Promise.allSettled(batch.map(fetchCity));
+      fetches.forEach((res, j) => {
+        if (res.status === 'fulfilled') {
+          results.push(res.value);
+        } else {
+          console.warn(`Falha em ${batch[j].n}:`, res.reason);
+        }
+      });
+    }
+    if (results.length === 0) throw new Error('Nenhuma cidade retornou dados. Verifique sua conexão com a internet.');
+    allData = results;
+    dates = results[0].d.time;
+    render();
+    const now = new Date();
+    document.getElementById('upd-label').textContent =
+      `Atualizado às ${now.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} de ${now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'})} · Open-Meteo · ${results.length}/${CITIES.length} cidades`;
+  } catch(e) {
+    document.getElementById('content').innerHTML = `<div class="err"><strong>Erro:</strong> ${e.message}</div>`;
+  }
+  btn.textContent = '⟳ Atualizar'; btn.disabled = false;
+}
+
+function render() {
+  // Summary cards (today = index 0)
+  let topRain=-1, topRainCity='', minT=99, minTCity='', frosts=0;
+  allData.forEach(({city,d}) => {
+    const rain = d.precipitation_sum[0] || 0;
+    const tmin = d.temperature_2m_min[0];
+    if (rain > topRain) { topRain = rain; topRainCity = city.n; }
+    if (tmin !== null && tmin < minT) { minT = tmin; minTCity = city.n; }
+    if (tmin !== null && tmin <= 2) frosts++;
+  });
+  document.getElementById('c-total').textContent = CITIES.length;
+  document.getElementById('c-rain').textContent = topRain.toFixed(1) + ' mm';
+  document.getElementById('c-rain-city').textContent = topRainCity;
+  document.getElementById('c-tmin').textContent = minT < 99 ? minT.toFixed(1) + '°C' : '—';
+  document.getElementById('c-tmin-city').textContent = minTCity;
+  document.getElementById('c-frost').textContent = frosts;
+
+  // Max rain per day across all cities (for bar scaling)
+  const maxRainPerDay = dates.map((_, di) =>
+    Math.max(...allData.map(r => r.d.precipitation_sum[di] || 0))
+  );
+
+  // Build day headers
+  const dayHeaders1 = dates.map((dt, i) => {
+    const d = new Date(dt + 'T12:00:00');
+    const lbl = i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : DAYS_PT[d.getDay()];
+    return { lbl, date: `${d.getDate()}/${d.getMonth()+1}`, isToday: i === 0 };
+  });
+
+  // Group cities by state
+  const byState = {};
+  allData.forEach(({ city, d }) => {
+    if (!byState[city.uf]) byState[city.uf] = [];
+    byState[city.uf].push({ city, d });
+  });
+
+  let html = '';
+  Object.keys(byState).sort().forEach(uf => {
+    const thDays1 = dayHeaders1.map(h =>
+      `<th class="day-head${h.isToday?' today':''}" colspan="1">${h.lbl}</th>`
+    ).join('');
+    const thDays2 = dayHeaders1.map(h =>
+      `<th class="day-sub${h.isToday?' today':''}">${h.date}</th>`
+    ).join('');
+
+    html += `<div class="state-block">
+      <div class="state-label">${uf} — ${STATE_NAMES[uf]||uf}</div>
+      <div class="table-scroll"><table>
+        <thead>
+          <tr><th class="city-head" rowspan="2">Cidade</th>${thDays1}</tr>
+          <tr>${thDays2}</tr>
+        </thead>
+        <tbody>`;
+
+    byState[uf].forEach(({ city, d }) => {
+      const dayCells = dates.map((_, di) => {
+        const rain = d.precipitation_sum[di] || 0;
+        const tmin = d.temperature_2m_min[di];
+        const tmax = d.temperature_2m_max[di];
+        const frost = tmin !== null && tmin <= 2;
+        const pct = maxRainPerDay[di] > 0 ? Math.min(100, (rain / maxRainPerDay[di]) * 100) : 0;
+        const todayCls = di === 0 ? ' today-col' : '';
+        return `<td class="day-cell${todayCls}">
+          <div class="temps">
+            <span class="temp-min">${tmin !== null ? tmin.toFixed(1)+'°' : '—'}</span>
+            <span class="sep">/</span>
+            <span class="temp-max">${tmax !== null ? tmax.toFixed(1)+'°' : '—'}</span>
+          </div>
+          <div class="rain-row">
+            <div class="rain-bg"><div class="rain-fill" style="width:${pct.toFixed(1)}%"></div></div>
+            <span class="rain-val">${rain.toFixed(1)}</span>
+          </div>
+          ${frost ? '<div style="text-align:center"><span class="frost-tag">⚠ geada</span></div>' : ''}
+        </td>`;
+      }).join('');
+
+      html += `<tr><td class="city-name">${city.n}</td>${dayCells}</tr>`;
+    });
+
+    html += `</tbody></table></div></div>`;
+  });
+
+  document.getElementById('content').innerHTML = html;
+}
+
+loadAll();
+</script>
+</body>
+</html>
